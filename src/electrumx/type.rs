@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 // crates.io
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 #[derive(Debug, Serialize)]
 pub struct Params<P>
@@ -59,19 +60,22 @@ pub struct Candidate {
 	pub reveal_location_height: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Ft {
 	#[serde(rename = "$bitwork")]
 	pub bitwork: Bitwork,
 	#[serde(rename = "$max_mints")]
 	pub max_mints: u64,
 	#[serde(rename = "$max_supply")]
-	pub max_supply: u64,
+	// pub max_supply: u64,
+	pub max_supply: i64, // under perpetual/infinite mode, max_supply is -1
 	#[serde(rename = "$mint_amount")]
 	pub mint_amount: u64,
+	#[serde(default)]
 	#[serde(rename = "$mint_bitworkc")]
-	pub mint_bitworkc: String,
-	#[serde(rename = "$mint_bitworkr")]
+	pub mint_bitworkc: Option<String>,
+	#[serde(default, rename = "$mint_bitworkr")]
 	pub mint_bitworkr: Option<String>,
 	#[serde(rename = "$mint_height")]
 	pub mint_height: u64,
@@ -83,6 +87,19 @@ pub struct Ft {
 	pub ticker: String,
 	#[serde(rename = "$ticker_candidates")]
 	pub ticker_candidates: Vec<TickerCandidate>,
+	// MI
+	#[serde(rename = "$mint_mode")]
+	pub mint_mode: String,
+	#[serde(default, rename = "$mint_bitwork_vec")]
+	pub mint_bitwork_vec: Option<String>,
+	#[serde(default, rename = "$mint_bitworkc_inc")]
+	pub mint_bitworkc_inc: Option<u32>,
+	#[serde(default, rename = "$mint_bitworkc_start")]
+	pub mint_bitworkc_start: Option<u32>,
+	#[serde(default, rename = "$mint_bitworkr_inc")]
+	pub mint_bitworkr_inc: Option<u32>,
+	#[serde(default, rename = "$mint_bitworkr_start")]
+	pub mint_bitworkr_start: Option<u32>,
 	pub atomical_id: String,
 	pub atomical_number: u64,
 	pub atomical_ref: String,
@@ -94,18 +111,18 @@ pub struct Ft {
 	pub subtype: String,
 	pub r#type: String,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Bitwork {
 	pub bitworkc: String,
 	pub bitworkr: Option<String>,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct TickerStatus {
 	pub note: String,
 	pub status: String,
 	pub verified_atomical_id: String,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct TickerCandidate {
 	pub atomical_id: String,
 	pub commit_height: u64,
@@ -113,31 +130,37 @@ pub struct TickerCandidate {
 	pub tx_num: u64,
 	pub txid: String,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct DftInfo {
 	pub mint_count: u64,
+	pub mint_bitworkc_current: Option<String>,
+	pub mint_bitworkc_next: Option<String>,
+	pub mint_bitworkc_next_next: Option<String>,
+	pub mint_bitworkr_current: Option<String>,
+	pub mint_bitworkr_next: Option<String>,
+	pub mint_bitworkr_next_next: Option<String>,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct LocationSummary {
 	pub circulating_supply: u64,
 	pub unique_holders: u64,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct MintData {
 	pub fields: Fields,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Fields {
 	pub args: Args,
 	pub meta: Option<Meta>,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Args {
 	pub bitworkc: String,
 	pub bitworkr: Option<String>,
 	pub max_mints: u64,
 	pub mint_amount: u64,
-	pub mint_bitworkc: String,
+	pub mint_bitworkc: Option<String>,
 	pub mint_bitworkr: Option<String>,
 	pub mint_height: u64,
 	// TODO: It's a `String` in mainnet but a `u64` in testnet.
@@ -145,22 +168,22 @@ pub struct Args {
 	pub request_ticker: String,
 	pub time: u64,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Meta {
 	pub description: Option<String>,
 	pub legal: Option<Legal>,
 	pub name: Option<String>,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Legal {
 	pub terms: String,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct MintInfo {
 	#[serde(rename = "$bitwork")]
 	pub bitwork: Bitwork,
 	#[serde(rename = "$mint_bitworkc")]
-	pub mint_bitworkc: String,
+	pub mint_bitworkc: Option<String>,
 	#[serde(rename = "$mint_bitworkr")]
 	pub mint_bitworkr: Option<String>,
 	#[serde(rename = "$request_ticker")]
@@ -185,10 +208,10 @@ pub struct MintInfo {
 	pub reveal_location_value: u64,
 }
 // TODO: Check the real type.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Ctx {}
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Unspent {
 	pub txid: String,
 	pub tx_hash: String,
@@ -198,7 +221,8 @@ pub struct Unspent {
 	pub height: u64,
 	pub value: u64,
 	// TODO: Check the real type.
-	pub atomicals: Vec<()>,
+	// pub atomicals: Vec<()>,
+	pub atomicals: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -207,7 +231,8 @@ pub struct Utxo {
 	// The same as `output_index` and `index`.
 	pub vout: u32,
 	pub value: u64,
-	pub atomicals: Vec<()>,
+	// pub atomicals: Vec<()>,
+	pub atomicals: Vec<String>,
 }
 impl From<Unspent> for Utxo {
 	fn from(v: Unspent) -> Self {

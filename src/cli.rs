@@ -60,16 +60,19 @@ pub struct Cli {
 	/// Ticker of the network to mine on.
 	#[arg(long, value_name = "NAME")]
 	ticker: String,
+	/// Mine with the current actual bitwork otherwise use the next by default.
+	#[arg(long, value_name = "CURRENT")]
+	current: bool,
 }
 impl Cli {
 	pub async fn run(self) -> Result<()> {
-		let Cli { rust_engine, js_engine, network, max_fee, electrumx, ticker } = self;
+		let Cli { rust_engine, js_engine, network, max_fee, electrumx, ticker, current } = self;
 		let ticker = ticker.to_lowercase();
 
 		if let Some(d) = js_engine {
 			js::run(network.as_atomical_js_network(), &electrumx, &d, &ticker, max_fee).await?;
 		} else if let Some(d) = rust_engine {
-			rust::run(network.into(), &electrumx, &d, &ticker, max_fee).await?;
+			rust::run(network.into(), &electrumx, &d, &ticker, max_fee, current).await?;
 		}
 
 		Ok(())

@@ -39,8 +39,9 @@ pub async fn run(
 	wallet_dir: &Path,
 	ticker: &str,
 	max_fee: u64,
+	current: bool,
 ) -> Result<()> {
-	let m = MinerBuilder { network, electrumx, wallet_dir, ticker, max_fee }.build()?;
+	let m = MinerBuilder { network, electrumx, wallet_dir, ticker, max_fee, current }.build()?;
 
 	#[allow(clippy::never_loop)]
 	loop {
@@ -48,7 +49,7 @@ pub async fn run(
 			m.mine(w).await?;
 
 			// Test only.
-			// return Ok(());
+			return Ok(());
 		}
 	}
 }
@@ -60,6 +61,7 @@ struct Miner {
 	wallets: Vec<Wallet>,
 	ticker: String,
 	max_fee: u64,
+	current: bool,
 }
 impl Miner {
 	const BASE_BYTES: f64 = 10.5;
@@ -142,7 +144,8 @@ impl Miner {
 			tracing::info!("spawning commit worker thread {i} for sequence range {r:?}");
 
 			let secp = secp.clone();
-			let bitworkc = bitworkc.clone();
+			// let bitworkc = bitworkc.clone();
+			let Some(bitworkc) = bitworkc.clone() else { todo!() };
 			let funding_kp = wallet.funding.pair.tap_tweak(&secp, None).to_inner();
 			let funding_xpk = wallet.funding.x_only_public_key;
 			let input = commit_input.clone();
@@ -522,8 +525,13 @@ impl Miner {
 		if ft.mint_amount == 0 || ft.mint_amount >= 100_000_000 {
 			Err(anyhow::anyhow!("mint amount mismatch"))?;
 		}
+		// if ft.dft_info.mint_count >= ft.max_mints {
+		// 	Err(anyhow::anyhow!("max mints reached"))?;
+		// }
 		if ft.dft_info.mint_count >= ft.max_mints {
-			Err(anyhow::anyhow!("max mints reached"))?;
+			if ft.mint_mode == "fixed" {
+			    Err(anyhow::anyhow!("max mints reached"))?;
+			}
 		}
 
 		let secp = Secp256k1::new();
@@ -536,13 +544,34 @@ impl Miner {
 			value: Amount::from_sat(ft.mint_amount),
 			script_pubkey: wallet.stash.address.script_pubkey(),
 		}];
+
+		let bitworkc = if ft.mint_bitworkc.is_some() {
+			ft.mint_bitworkc.clone()
+		} else if self.current {
+			ft.dft_info.mint_bitworkc_current.clone()
+		} else {
+			ft.dft_info.mint_bitworkc_next.clone()
+		};
+
+		let bitworkr = if ft.mint_bitworkr.is_some() {
+			ft.mint_bitworkr.clone()
+		} else if self.current {
+			ft.dft_info.mint_bitworkr_current.clone()
+		} else {
+			ft.dft_info.mint_bitworkr_next.clone()
+		};
+
 		let payload = PayloadWrapper {
 			args: {
 				let (time, nonce) = util::time_nonce();
 				tracing::info!("payload time: {time}, payload nonce: {nonce}");
+				if ft.mint_mode == "perpetual" || ft.mint_mode == "infinite" {
+					tracing::info!("Minting under perpetual/infinite mode, payload bitworkc: {}", bitworkc.clone().unwrap());
+				}
 
 				Payload {
-					bitworkc: ft.mint_bitworkc.clone(),
+					bitworkc: bitworkc.clone(),
+					bitworkr: bitworkr.clone(),
 					mint_ticker: ft.ticker.clone(),
 					nonce,
 					time,
@@ -557,7 +586,8 @@ impl Miner {
 			.add_leaf(0, reveal_script.clone())?
 			.finalize(&secp, wallet.funding.x_only_public_key)
 			.unwrap();
-		let perform_bitworkr = if ft.mint_bitworkr.is_some() { true } else { false };
+		// let perform_bitworkr = if ft.mint_bitworkr.is_some() { true } else { false }; // not correct for perpetual mode
+		let perform_bitworkr = if bitworkr.is_some() { true } else { false };
 		let fees = Self::fees_of(
 			satsbyte,
 			reveal_script.as_bytes().len(),
@@ -572,8 +602,8 @@ impl Miner {
 		Ok(Data {
 			secp,
 			satsbyte,
-			bitworkc: ft.mint_bitworkc,
-			bitworkr: ft.mint_bitworkr,
+			bitworkc,
+			bitworkr,
 			additional_outputs,
 			reveal_script,
 			reveal_spend_info,
@@ -659,6 +689,7 @@ struct MinerBuilder<'a> {
 	wallet_dir: &'a Path,
 	ticker: &'a str,
 	max_fee: u64,
+	current: bool,
 }
 impl<'a> MinerBuilder<'a> {
 	fn build(self) -> Result<Miner> {
@@ -675,6 +706,7 @@ impl<'a> MinerBuilder<'a> {
 			wallets,
 			ticker: self.ticker.into(),
 			max_fee: self.max_fee,
+			current: self.current,
 		})
 	}
 }
@@ -719,7 +751,8 @@ pub struct PayloadWrapper {
 }
 #[derive(Debug, Serialize)]
 pub struct Payload {
-	pub bitworkc: String,
+	pub bitworkc: Option<String>,
+	pub bitworkr: Option<String>,
 	pub mint_ticker: String,
 	pub nonce: u64,
 	pub time: u64,
@@ -729,7 +762,7 @@ pub struct Payload {
 struct Data {
 	secp: Secp256k1<All>,
 	satsbyte: u64,
-	bitworkc: String,
+	bitworkc: Option<String>,
 	bitworkr: Option<String>,
 	additional_outputs: Vec<TxOut>,
 	reveal_script: ScriptBuf,
